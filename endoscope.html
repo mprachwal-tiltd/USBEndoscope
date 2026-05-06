@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Endoscope Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #000;
+    --panel: rgba(22, 22, 24, 0.78);
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #f4f4f5;
+    --text-dim: #9ca3af;
+    --accent: #14b8a6;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    overscroll-behavior: none;
+  }
+
+  #app {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #video {
+    max-width: 100%;
+    max-height: 100%;
+    transition: transform 0.25s ease;
+    background: #000;
+  }
+
+  /* TOP BAR */
+  #top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, transparent 100%);
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    transition: opacity 0.3s;
+  }
+
+  #device-select {
+    flex: 1;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 32px 11px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+
+  .icon-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: background 0.15s, transform 0.1s;
+    flex-shrink: 0;
+  }
+
+  .icon-btn:active {
+    transform: scale(0.94);
+    background: rgba(255,255,255,0.1);
+  }
+
+  /* BOTTOM CONTROLS */
+  #controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 16px calc(env(safe-area-inset-bottom, 16px) + 16px);
+    background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+    z-index: 10;
+    transition: opacity 0.3s;
+  }
+
+  .control-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .control-btn {
+    width: 56px;
+    height: 56px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: background 0.15s, transform 0.1s;
+    flex-shrink: 0;
+  }
+
+  .control-btn:active {
+    transform: scale(0.92);
+    background: rgba(255,255,255,0.15);
+  }
+
+  .control-btn.snapshot {
+    background: var(--text);
+    color: var(--bg);
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.2);
+  }
+
+  .control-btn.snapshot:active {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* SETTINGS PANEL */
+  #settings-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 19;
+  }
+
+  #settings-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #settings {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 24px 20px calc(env(safe-area-inset-bottom, 16px) + 24px);
+    background: rgba(15, 15, 17, 0.92);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    z-index: 20;
+  }
+
+  #settings.open {
+    transform: translateY(0);
+  }
+
+  #settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  #settings-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .slider-row {
+    margin-bottom: 18px;
+  }
+
+  .slider-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+
+  .slider-label span:last-child {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    background: var(--text);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    background: var(--text);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+
+  .reset-btn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    margin-top: 8px;
+    width: 100%;
+  }
+
+  .reset-btn:active {
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* STATUS OVERLAY */
+  #status {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    z-index: 50;
+    background: var(--bg);
+  }
+
+  #status.hidden { display: none; }
+
+  #status-content { max-width: 320px; }
+
+  #status-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 20px;
+    color: var(--text-dim);
+  }
+
+  #status-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  #status-message {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+
+  #status-action {
+    background: var(--text);
+    color: var(--bg);
+    border: none;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  #status-action:active { background: var(--accent); color: white; }
+
+  /* PAUSED BADGE */
+  #paused-badge {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 76px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    z-index: 15;
+    display: none;
+  }
+
+  #paused-badge.visible { display: block; }
+
+  /* HIDE UI WHEN INACTIVE */
+  .hidden-ui #top-bar,
+  .hidden-ui #controls {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* FLASH */
+  #flash {
+    position: fixed;
+    inset: 0;
+    background: white;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  #flash.active { opacity: 0.85; transition: opacity 0s; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <video id="video" autoplay playsinline muted></video>
+</div>
+
+<div id="top-bar">
+  <select id="device-select"></select>
+  <button class="icon-btn" id="refresh-btn" aria-label="Refresh devices">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+  </button>
+</div>
+
+<div id="paused-badge">Paused</div>
+
+<div id="controls">
+  <div class="control-row">
+    <button class="control-btn" id="rotate-btn" aria-label="Rotate">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+    </button>
+    <button class="control-btn" id="pause-btn" aria-label="Pause/Play">
+      <svg id="pause-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+      <svg id="play-icon" style="display:none" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>
+    </button>
+    <button class="control-btn snapshot" id="snapshot-btn" aria-label="Snapshot">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </button>
+    <button class="control-btn" id="settings-btn" aria-label="Settings">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="settings-backdrop"></div>
+<div id="settings">
+  <div id="settings-header">
+    <div id="settings-title">Image Adjustments</div>
+    <button class="icon-btn" id="settings-close" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span>Brightness</span><span id="brightness-val">100%</span></div>
+    <input type="range" id="brightness" min="50" max="200" value="100">
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span>Contrast</span><span id="contrast-val">100%</span></div>
+    <input type="range" id="contrast" min="50" max="200" value="100">
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span>Saturation</span><span id="saturation-val">100%</span></div>
+    <input type="range" id="saturation" min="0" max="200" value="100">
+  </div>
+  <button class="reset-btn" id="reset-btn">Reset to Defaults</button>
+</div>
+
+<div id="status">
+  <div id="status-content">
+    <svg id="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    <div id="status-title">Connecting…</div>
+    <div id="status-message">Requesting camera access</div>
+    <button id="status-action" style="display:none">Try Again</button>
+  </div>
+</div>
+
+<canvas id="snapshot-canvas" style="display:none"></canvas>
+<div id="flash"></div>
+
+<script>
+const video = document.getElementById('video');
+const deviceSelect = document.getElementById('device-select');
+const status = document.getElementById('status');
+const statusTitle = document.getElementById('status-title');
+const statusMessage = document.getElementById('status-message');
+const statusAction = document.getElementById('status-action');
+const settings = document.getElementById('settings');
+const settingsBackdrop = document.getElementById('settings-backdrop');
+const pausedBadge = document.getElementById('paused-badge');
+
+let currentStream = null;
+let rotation = 0;
+let isPaused = false;
+let filters = { brightness: 100, contrast: 100, saturation: 100 };
+
+function showStatus(title, message, actionLabel) {
+  statusTitle.textContent = title;
+  statusMessage.textContent = message;
+  if (actionLabel) {
+    statusAction.textContent = actionLabel;
+    statusAction.style.display = 'inline-block';
+  } else {
+    statusAction.style.display = 'none';
+  }
+  status.classList.remove('hidden');
+}
+
+function hideStatus() { status.classList.add('hidden'); }
+
+function applyFilters() {
+  video.style.filter = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturation}%)`;
+}
+
+function applyRotation() {
+  video.style.transform = `rotate(${rotation}deg)`;
+  if (rotation === 90 || rotation === 270) {
+    video.style.maxWidth = window.innerHeight + 'px';
+    video.style.maxHeight = window.innerWidth + 'px';
+  } else {
+    video.style.maxWidth = '100%';
+    video.style.maxHeight = '100%';
+  }
+}
+
+async function listDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+    deviceSelect.innerHTML = '';
+    if (videoInputs.length === 0) {
+      showStatus('No camera found', 'Connect your USB-C endoscope, then tap Try Again.', 'Try Again');
+      return [];
+    }
+    videoInputs.forEach((d, i) => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Camera ${i + 1}`;
+      deviceSelect.appendChild(opt);
+    });
+    return videoInputs;
+  } catch (err) {
+    showStatus('Error listing cameras', err.message, 'Try Again');
+    return [];
+  }
+}
+
+function pickPreferredDevice(videoInputs) {
+  // Filter out built-in Pixel cameras (front, back, wide, ultra, telephoto)
+  const external = videoInputs.find(d => {
+    const label = (d.label || '').toLowerCase();
+    if (!label) return false;
+    return !label.includes('front') &&
+           !label.includes('back') &&
+           !label.includes('rear') &&
+           !label.includes('facing') &&
+           !label.includes('wide') &&
+           !label.includes('ultra') &&
+           !label.includes('telephoto') &&
+           !label.includes('selfie') &&
+           !label.includes('built-in');
+  });
+  return external ? external.deviceId : videoInputs[0]?.deviceId;
+}
+
+async function startStream(deviceId) {
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => t.stop());
+  }
+  try {
+    const constraints = {
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    };
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = currentStream;
+    isPaused = false;
+    pausedBadge.classList.remove('visible');
+    document.getElementById('pause-icon').style.display = '';
+    document.getElementById('play-icon').style.display = 'none';
+    hideStatus();
+  } catch (err) {
+    let msg = err.message;
+    if (err.name === 'NotAllowedError') msg = 'Camera permission was denied. Allow access in your browser settings and reload.';
+    else if (err.name === 'NotFoundError') msg = 'Camera not found. Make sure your endoscope is plugged in.';
+    else if (err.name === 'NotReadableError') msg = 'Camera is in use by another app. Close other apps and try again.';
+    else if (err.name === 'OverconstrainedError') msg = 'This camera does not support the requested settings. Try another device.';
+    showStatus('Camera error', msg, 'Try Again');
+  }
+}
+
+async function init() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showStatus('Not supported', 'Your browser does not support camera access. Try Chrome.');
+    return;
+  }
+  showStatus('Connecting…', 'Requesting camera access');
+  try {
+    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    tempStream.getTracks().forEach(t => t.stop());
+  } catch (err) {
+    let msg = err.message;
+    if (err.name === 'NotAllowedError') msg = 'Camera permission was denied. Allow access and try again.';
+    showStatus('Permission needed', msg, 'Try Again');
+    return;
+  }
+  const videoInputs = await listDevices();
+  if (videoInputs.length === 0) return;
+  const preferredId = pickPreferredDevice(videoInputs);
+  deviceSelect.value = preferredId;
+  await startStream(preferredId);
+}
+
+// Wire up controls
+deviceSelect.addEventListener('change', e => startStream(e.target.value));
+
+document.getElementById('refresh-btn').addEventListener('click', async () => {
+  const videoInputs = await listDevices();
+  if (videoInputs.length > 0) {
+    const preferredId = pickPreferredDevice(videoInputs);
+    deviceSelect.value = preferredId;
+    await startStream(preferredId);
+  }
+});
+
+document.getElementById('rotate-btn').addEventListener('click', () => {
+  rotation = (rotation + 90) % 360;
+  applyRotation();
+});
+
+document.getElementById('pause-btn').addEventListener('click', () => {
+  if (isPaused) {
+    video.play();
+    document.getElementById('pause-icon').style.display = '';
+    document.getElementById('play-icon').style.display = 'none';
+    pausedBadge.classList.remove('visible');
+  } else {
+    video.pause();
+    document.getElementById('pause-icon').style.display = 'none';
+    document.getElementById('play-icon').style.display = '';
+    pausedBadge.classList.add('visible');
+  }
+  isPaused = !isPaused;
+});
+
+document.getElementById('snapshot-btn').addEventListener('click', () => {
+  if (!video.videoWidth) return;
+  const canvas = document.getElementById('snapshot-canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.filter = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturation}%)`;
+  ctx.drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.download = `endoscope-${ts}.png`;
+    a.href = url;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }, 'image/png');
+  const flash = document.getElementById('flash');
+  flash.classList.add('active');
+  setTimeout(() => flash.classList.remove('active'), 80);
+});
+
+function openSettings() {
+  settings.classList.add('open');
+  settingsBackdrop.classList.add('open');
+}
+function closeSettings() {
+  settings.classList.remove('open');
+  settingsBackdrop.classList.remove('open');
+}
+document.getElementById('settings-btn').addEventListener('click', openSettings);
+document.getElementById('settings-close').addEventListener('click', closeSettings);
+settingsBackdrop.addEventListener('click', closeSettings);
+
+statusAction.addEventListener('click', init);
+
+['brightness', 'contrast', 'saturation'].forEach(prop => {
+  const input = document.getElementById(prop);
+  const valDisplay = document.getElementById(prop + '-val');
+  input.addEventListener('input', e => {
+    const val = parseInt(e.target.value);
+    filters[prop] = val;
+    valDisplay.textContent = val + '%';
+    applyFilters();
+  });
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  filters = { brightness: 100, contrast: 100, saturation: 100 };
+  ['brightness', 'contrast', 'saturation'].forEach(prop => {
+    document.getElementById(prop).value = 100;
+    document.getElementById(prop + '-val').textContent = '100%';
+  });
+  applyFilters();
+});
+
+// Auto-hide UI after inactivity
+let hideTimer;
+function resetHideTimer() {
+  document.body.classList.remove('hidden-ui');
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    if (!settings.classList.contains('open') && !status.classList.contains('hidden') === false) {
+      document.body.classList.add('hidden-ui');
+    }
+  }, 4000);
+}
+document.addEventListener('touchstart', resetHideTimer, { passive: true });
+document.addEventListener('click', resetHideTimer);
+resetHideTimer();
+
+// Re-detect when devices change (plug/unplug)
+if (navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', async () => {
+    const videoInputs = await listDevices();
+    if (videoInputs.length > 0) {
+      const currentId = currentStream?.getVideoTracks()[0]?.getSettings()?.deviceId;
+      const stillExists = currentId && videoInputs.find(d => d.deviceId === currentId);
+      if (stillExists) {
+        deviceSelect.value = currentId;
+      } else {
+        const preferredId = pickPreferredDevice(videoInputs);
+        deviceSelect.value = preferredId;
+        await startStream(preferredId);
+      }
+    }
+  });
+}
+
+window.addEventListener('resize', applyRotation);
+
+init();
+</script>
+</body>
+</html>
